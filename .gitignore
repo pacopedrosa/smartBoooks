@@ -1,0 +1,29 @@
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Entorno
+.env
+.env.local
+.env.production
+
+# Docker volumes locales
+postgres_data/
+minio_data/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

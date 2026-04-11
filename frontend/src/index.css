@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Animaciones personalizadas usadas como clases de utilidad */
+@keyframes spin-custom {
+  to { transform: rotate(360deg); }
+}
+@keyframes slide-in {
+  from { transform: translateX(120%); }
+  to   { transform: translateX(0); }
+}
+
+.animate-spin-custom { animation: spin-custom 0.7s linear infinite; }
+.animate-slide-in    { animation: slide-in 0.25s ease; }
