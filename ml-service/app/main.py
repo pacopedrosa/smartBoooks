@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,14 +8,27 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .schemas import RecommendationResponse, SimilarBooksResponse
 from .recommender import get_recommendations, get_similar_books
+from .seed import seed_books
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ejecuta el seed del dataset al arrancar el servicio."""
+    try:
+        seed_books()
+    except Exception as exc:
+        logger.warning("Seed no completado (no crítico): %s", exc)
+    yield
+
 
 app = FastAPI(
     title="SmartBooks ML Service",
     description="Servicio de recomendación de libros mediante Inteligencia Artificial",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

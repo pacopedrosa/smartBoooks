@@ -101,9 +101,19 @@ export default function Recommendations() {
               <div className="flex flex-col gap-4">
                 {data.recommendations.map((rec, i) => (
                   <div key={rec.book_id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow flex gap-4 p-4 items-start">
-                    {/* Mini portada */}
-                    <div className="w-16 min-w-16 aspect-[2/3] rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-2xl flex-shrink-0">
-                      📖
+                    {/* Portada real del libro */}
+                    <div className="w-16 min-w-16 aspect-[2/3] rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden flex-shrink-0">
+                      {rec.cover_url ? (
+                        <img
+                          src={rec.cover_url}
+                          alt={rec.title}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-2xl">📖</div>
+                      )}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -121,9 +131,16 @@ export default function Recommendations() {
                       <span className="inline-block mt-2 text-[11px] bg-blue-50 text-[#1e3a5f] px-2 py-0.5 rounded">
                         {rec.reason}
                       </span>
-                      <p className="text-[11px] text-slate-400 mt-1.5">
-                        Relevancia: <strong>{(rec.score * 100).toFixed(1)}%</strong>
-                      </p>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <p className="text-[11px] text-slate-400">
+                          Relevancia: <strong>{(rec.score * 100).toFixed(1)}%</strong>
+                        </p>
+                        {rec.price != null && (
+                          <p className="text-[11px] font-bold text-[#1e3a5f]">
+                            {rec.currency ?? '$'}{Number(rec.price).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

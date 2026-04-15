@@ -6,12 +6,12 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const { genre, search, page = '1', limit = '12' } = req.query;
+  const { genre, format, search, page = '1', limit = '12' } = req.query;
   const userId = req.user.id;
 
-  const pageNum = Math.max(1, parseInt(page, 10));
+  const pageNum  = Math.max(1, parseInt(page, 10));
   const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10)));
-  const offset = (pageNum - 1) * limitNum;
+  const offset   = (pageNum - 1) * limitNum;
 
   const params = [userId];
   let paramIdx = 1;
@@ -21,6 +21,12 @@ async function handler(req, res) {
     paramIdx++;
     conditions.push(`b.genre = $${paramIdx}`);
     params.push(genre);
+  }
+
+  if (format) {
+    paramIdx++;
+    conditions.push(`b.format = $${paramIdx}`);
+    params.push(format);
   }
 
   if (search) {
@@ -41,7 +47,9 @@ async function handler(req, res) {
 
   const booksQuery = `
     SELECT
-      b.*,
+      b.id, b.title, b.author, b.genre, b.format,
+      b.cover_url, b.isbn, b.price, b.currency, b.old_price,
+      b.average_rating, b.total_ratings,
       CASE WHEN l.id IS NOT NULL THEN true ELSE false END AS is_liked,
       CASE WHEN f.id IS NOT NULL THEN true ELSE false END AS is_favorited,
       COALESCE(r.rating, 0) AS user_rating
@@ -50,7 +58,7 @@ async function handler(req, res) {
     LEFT JOIN favorites f ON f.book_id = b.id AND f.user_id = $1
     LEFT JOIN ratings   r ON r.book_id = b.id AND r.user_id = $1
     ${whereClause}
-    ORDER BY b.id ASC
+    ORDER BY b.average_rating DESC, b.id ASC
     LIMIT $${limitPlaceholder} OFFSET $${offsetPlaceholder}
   `;
 
@@ -63,6 +71,12 @@ async function handler(req, res) {
     countIdx++;
     countConditions.push(`genre = $${countIdx}`);
     countParams.push(genre);
+  }
+
+  if (format) {
+    countIdx++;
+    countConditions.push(`format = $${countIdx}`);
+    countParams.push(format);
   }
 
   if (search) {
@@ -84,7 +98,7 @@ async function handler(req, res) {
     return res.status(200).json({
       books: booksResult.rows,
       total: parseInt(countResult.rows[0].count, 10),
-      page: pageNum,
+      page:  pageNum,
       limit: limitNum,
       pages: Math.ceil(parseInt(countResult.rows[0].count, 10) / limitNum),
     });

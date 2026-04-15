@@ -85,8 +85,10 @@ export default function BookCard({ book, onUpdate }) {
               {book.genre}
             </span>
           )}
-          {book.published_year && (
-            <span className="text-[11px] text-slate-400">{book.published_year}</span>
+          {book.format && (
+            <span className="bg-slate-100 text-slate-500 text-[11px] px-2 py-0.5 rounded">
+              {book.format}
+            </span>
           )}
         </div>
 
@@ -94,6 +96,19 @@ export default function BookCard({ book, onUpdate }) {
           <span className="text-amber-400">{renderStars(book.average_rating)}</span>
           <span>{Number(book.average_rating).toFixed(1)} ({book.total_ratings})</span>
         </div>
+
+        {book.price != null && (
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-sm font-bold text-[#1e3a5f]">
+              {book.currency ?? '$'}{Number(book.price).toFixed(2)}
+            </span>
+            {book.old_price && Number(book.old_price) > Number(book.price) && (
+              <span className="text-[11px] text-slate-400 line-through">
+                {book.currency ?? '$'}{Number(book.old_price).toFixed(2)}
+              </span>
+            )}
+          </div>
+        )}
 
         <StarInput value={userRating} onChange={handleRate} />
       </div>

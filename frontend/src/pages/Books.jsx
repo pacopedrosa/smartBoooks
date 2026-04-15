@@ -13,19 +13,21 @@ function Spinner() {
 export default function Books() {
   const [books,   setBooks]   = useState([]);
   const [genres,  setGenres]  = useState([]);
+  const [formats, setFormats] = useState([]);
   const [total,   setTotal]   = useState(0);
   const [pages,   setPages]   = useState(1);
   const [page,    setPage]    = useState(1);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
-  const [filters,    setFilters]    = useState({ search: '', genre: '' });
+  const [filters,    setFilters]    = useState({ search: '', genre: '', format: '' });
   const [draftSearch, setDraftSearch] = useState('');
 
   const fetchGenres = useCallback(async () => {
     try {
       const { data } = await booksAPI.genres();
       setGenres(data.genres);
+      setFormats(data.formats ?? []);
     } catch { /* no crítico */ }
   }, []);
 
@@ -33,7 +35,12 @@ export default function Books() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await booksAPI.list({ page, limit: 12, genre: filters.genre || undefined, search: filters.search || undefined });
+      const { data } = await booksAPI.list({
+        page, limit: 12,
+        genre:  filters.genre  || undefined,
+        format: filters.format || undefined,
+        search: filters.search || undefined,
+      });
       setBooks(data.books);
       setTotal(data.total);
       setPages(data.pages);
@@ -58,11 +65,16 @@ export default function Books() {
     setPage(1);
   }
 
+  function handleFormatChange(e) {
+    setFilters((prev) => ({ ...prev, format: e.target.value }));
+    setPage(1);
+  }
+
   function handleBookUpdate(updated) {
     setBooks((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
   }
 
-  const hasFilters = filters.search || filters.genre;
+  const hasFilters = filters.search || filters.genre || filters.format;
 
   return (
     <div className="py-8 min-h-[calc(100vh-64px)]">
@@ -92,8 +104,16 @@ export default function Books() {
             value={filters.genre}
             onChange={handleGenreChange}
           >
-            <option value="">Todos los géneros</option>
+            <option value="">Todas las categorías</option>
             {genres.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+          <select
+            className="border-2 border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-[140px] focus:outline-none focus:border-[#1e3a5f] transition-colors"
+            value={filters.format}
+            onChange={handleFormatChange}
+          >
+            <option value="">Todos los formatos</option>
+            {formats.map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
           <button type="submit" className="bg-[#1e3a5f] hover:bg-[#16304f] text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
             Buscar
@@ -102,7 +122,7 @@ export default function Books() {
             <button
               type="button"
               className="border-2 border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f] hover:text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
-              onClick={() => { setFilters({ search: '', genre: '' }); setDraftSearch(''); setPage(1); }}
+              onClick={() => { setFilters({ search: '', genre: '', format: '' }); setDraftSearch(''); setPage(1); }}
             >
               Limpiar
             </button>
