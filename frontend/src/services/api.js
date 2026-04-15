@@ -2,6 +2,9 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+console.log('[API] VITE_API_URL =', import.meta.env.VITE_API_URL);
+console.log('[API] baseURL =', `${API_BASE}/api`);
+
 const api = axios.create({
   baseURL: `${API_BASE}/api`,
   headers: { 'Content-Type': 'application/json' },
@@ -10,11 +13,28 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Log de todas las peticiones
+api.interceptors.request.use((config) => {
+  console.log(`[API REQUEST] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
+    data: config.data,
+    withCredentials: config.withCredentials,
+  });
+  return config;
+});
+
 // Si el servidor responde 401, limpiamos el usuario en localStorage y redirigimos
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    console.log(`[API RESPONSE] ${res.status} ${res.config.url}`, res.data);
+    return res;
+  },
   (err) => {
+    console.error(
+      `[API ERROR] ${err.response?.status ?? 'Network'} ${err.config?.url}`,
+      err.response?.data ?? err.message
+    );
     if (err.response?.status === 401) {
+      console.warn('[API] 401 detectado — limpiando sesión y redirigiendo a /login');
       localStorage.removeItem('sb_user');
       window.location.href = '/login';
     }

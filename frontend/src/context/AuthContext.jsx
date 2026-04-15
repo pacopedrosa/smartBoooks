@@ -11,23 +11,34 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem('sb_user');
-      if (stored) setUser(JSON.parse(stored));
-    } catch {
+      console.log('[AUTH] localStorage sb_user =', stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log('[AUTH] Usuario restaurado desde localStorage:', parsed);
+        setUser(parsed);
+      } else {
+        console.log('[AUTH] No hay sesión guardada en localStorage');
+      }
+    } catch (e) {
+      console.error('[AUTH] Error leyendo localStorage:', e);
       localStorage.removeItem('sb_user');
     }
     setLoading(false);
   }, []);
 
   const login = useCallback(async (email, password) => {
+    console.log('[AUTH] Intentando login para:', email);
     const { data } = await authAPI.login({ email, password });
-    // El backend pone la cookie httpOnly; aquí solo guardamos datos de display
+    console.log('[AUTH] Login exitoso, usuario:', data.user);
     localStorage.setItem('sb_user', JSON.stringify(data.user));
     setUser(data.user);
     return data.user;
   }, []);
 
   const register = useCallback(async (name, email, password) => {
+    console.log('[AUTH] Intentando registro para:', email);
     const { data } = await authAPI.register({ name, email, password });
+    console.log('[AUTH] Registro exitoso, usuario:', data.user);
     localStorage.setItem('sb_user', JSON.stringify(data.user));
     setUser(data.user);
     return data.user;

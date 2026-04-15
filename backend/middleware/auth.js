@@ -1,10 +1,11 @@
 import { verifyToken } from '../lib/jwt';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const IS_PROD      = process.env.NODE_ENV === 'production';
+const FRONTEND_URL  = process.env.FRONTEND_URL  || 'http://localhost:3000';
+const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true';
 
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin',  FRONTEND_URL);
+  res.setHeader('Access-Control-Allow-Origin',  "*");
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -17,13 +18,13 @@ function setCorsHeaders(res) {
  */
 export function buildTokenCookie(token) {
   const parts = [
-    `token=${token}`,
+    `sb_token=${token}`,
     'HttpOnly',
     'Path=/',
-    'SameSite=Strict',
+    'SameSite=Lax',
     'Max-Age=604800', // 7 días en segundos
   ];
-  if (IS_PROD) parts.push('Secure');
+  if (COOKIE_SECURE) parts.push('Secure');
   return parts.join('; ');
 }
 
@@ -33,13 +34,13 @@ export function buildTokenCookie(token) {
  */
 export function clearTokenCookie() {
   const parts = [
-    'token=',
+    'sb_token=',
     'HttpOnly',
     'Path=/',
-    'SameSite=Strict',
+    'SameSite=Lax',
     'Max-Age=0',
   ];
-  if (IS_PROD) parts.push('Secure');
+  if (COOKIE_SECURE) parts.push('Secure');
   return parts.join('; ');
 }
 
@@ -55,15 +56,20 @@ export function withAuth(handler) {
       return res.status(200).end();
     }
 
-    const token = req.cookies?.token;
+    console.log(`[AUTH MW] ${req.method} ${req.url} | cookies:`, Object.keys(req.cookies ?? {}));
+
+    const token = req.cookies?.sb_token;
     if (!token) {
+      console.warn(`[AUTH MW] 401 — sin cookie sb_token en ${req.url}`);
       return res.status(401).json({ error: 'Sesión no iniciada' });
     }
 
     try {
       req.user = verifyToken(token);
+      console.log(`[AUTH MW] Token válido para user ${req.user.id} en ${req.url}`);
       return handler(req, res);
-    } catch {
+    } catch (e) {
+      console.warn(`[AUTH MW] 401 — token inválido en ${req.url}:`, e.message);
       return res.status(401).json({ error: 'Sesión inválida o expirada' });
     }
   };

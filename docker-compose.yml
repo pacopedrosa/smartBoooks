@@ -103,7 +103,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3002
+        VITE_API_URL: ""
     container_name: smartbooks-frontend
     ports:
       - "3010:80"
