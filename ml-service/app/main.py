@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -5,22 +6,52 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from .database import get_db
+from .database import get_db, SessionLocal
 from .schemas import RecommendationResponse, SimilarBooksResponse
-from .recommender import get_recommendations, get_similar_books
+from .recommender import get_recommendations, get_similar_books, _get_all_books, _get_embeddings
 from .seed import seed_books
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _precompute_embeddings() -> None:
+    """Pre-calcula y cachea embeddings de todos los libros en PostgreSQL."""
+    db = SessionLocal()
+    try:
+        all_books = _get_all_books(db)
+        if all_books.empty:
+            logger.info("Pre-compute embeddings: no hay libros aún.")
+            return
+        missing_count = db.execute(
+            __import__('sqlalchemy').text(
+                "SELECT COUNT(*) FROM books WHERE embedding IS NULL"
+            )
+        ).scalar() or 0
+        if missing_count == 0:
+            logger.info("Pre-compute embeddings: todos los libros ya tienen embedding cacheado.")
+            return
+        logger.info(
+            "Pre-computando embeddings para %d libros sin caché (esto tarda unos minutos)...",
+            missing_count,
+        )
+        _get_embeddings(db, all_books)
+        logger.info("Pre-compute embeddings completado.")
+    except Exception as exc:
+        logger.error("Error pre-computando embeddings: %s", exc)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Ejecuta el seed del dataset al arrancar el servicio."""
+    """Ejecuta el seed y pre-computa embeddings al arrancar el servicio."""
     try:
         seed_books()
     except Exception as exc:
         logger.warning("Seed no completado (no crítico): %s", exc)
+    # Pre-cómputo en background para no bloquear el arranque del servidor
+    asyncio.get_event_loop().run_in_executor(None, _precompute_embeddings)
     yield
 
 
