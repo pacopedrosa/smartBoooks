@@ -12,7 +12,7 @@ async function handler(req, res) {
 
   try {
     const response = await fetch(`${mlUrl}/recommendations/${userId}?limit=${limit}`, {
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(300_000), // 5 min — la primera llamada calcula embeddings de ~32k libros
     });
 
     if (!response.ok) {
