@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS books (
     old_price      DECIMAL(10,2),
     average_rating DECIMAL(3,2) DEFAULT 0,
     total_ratings  INTEGER DEFAULT 0,
+    embedding      FLOAT8[],
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -66,6 +67,9 @@ CREATE INDEX IF NOT EXISTS idx_favorites_book   ON favorites(book_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_user     ON ratings(user_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_book     ON ratings(book_id);
 CREATE INDEX IF NOT EXISTS idx_books_genre      ON books(genre);
+
+-- Migración segura: añadir columna si el volumen ya existía
+ALTER TABLE books ADD COLUMN IF NOT EXISTS embedding FLOAT8[];
 
 -- ============================================================
 -- Los libros se cargan desde main_dataset.csv al levantar
