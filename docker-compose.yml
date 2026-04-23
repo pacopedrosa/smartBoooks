@@ -90,6 +90,20 @@ services:
       - smartbooks-network
     restart: unless-stopped
 
+  pgweb:
+    container_name: smartbooks-pgweb
+    restart: always
+    image: sosedoff/pgweb
+    ports:
+      - "8081:8081"
+    environment:
+      - PGWEB_DATABASE_URL=postgres://smartbooks:smartbooks_password@postgres:5432/smartbooks?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - smartbooks-network
+
 networks:
   smartbooks-network:
     driver: bridge
