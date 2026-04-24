@@ -74,19 +74,24 @@ def _get_user_interactions(db: Session, user_id: int) -> Dict[int, float]:
     return weights
 
 
-def _get_all_books(db: Session, max_books: int = 12000) -> pd.DataFrame:
+def _get_all_books(db: Session, max_books: int = 150000) -> pd.DataFrame:
     """
-    Recupera los top `max_books` libros por rating.
+    Recupera los top `max_books` libros ordenados por popularidad
+    (número de likes + favoritos) o, si no hay interacciones aún, por id.
 
-    Siempre devuelve los mejores libros (con o sin embedding), para que
-    _get_embeddings pueda calcular los que falten. Los libros sin embedding
-    no aparecerán en recomendaciones hasta que _get_embeddings los procese.
+    Incluye la columna `description` para generar embeddings semánticos
+    más ricos con el nuevo dataset (BooksDatasetClean.csv).
     """
     rows = db.execute(
         text(
-            "SELECT id, title, author, genre, format, cover_url, "
-            "price, currency, average_rating FROM books "
-            "ORDER BY average_rating DESC NULLS LAST "
+            "SELECT b.id, b.title, b.author, b.genre, b.cover_url, "
+            "b.price, b.currency, b.average_rating, b.description, "
+            "COALESCE(COUNT(DISTINCT l.id), 0) + COALESCE(COUNT(DISTINCT f.id), 0) AS popularity "
+            "FROM books b "
+            "LEFT JOIN likes l ON l.book_id = b.id "
+            "LEFT JOIN favorites f ON f.book_id = b.id "
+            "GROUP BY b.id "
+            "ORDER BY popularity DESC, b.id "
             "LIMIT :lim"
         ),
         {"lim": max_books},
@@ -96,8 +101,8 @@ def _get_all_books(db: Session, max_books: int = 12000) -> pd.DataFrame:
         return pd.DataFrame()
     return pd.DataFrame(
         rows,
-        columns=["id", "title", "author", "genre", "format",
-                 "cover_url", "price", "currency", "average_rating"],
+        columns=["id", "title", "author", "genre", "cover_url",
+                 "price", "currency", "average_rating", "description", "popularity"],
     )
 
 
@@ -160,11 +165,14 @@ def _get_embeddings(db: Session, all_books: pd.DataFrame) -> np.ndarray:
         for batch_start in range(0, len(missing_list), EMBED_BATCH):
             batch = missing_list.iloc[batch_start: batch_start + EMBED_BATCH]
             t = batch["title"].fillna("")
+            # Incluir descripción si existe — da mucho más contexto semántico
+            # al modelo y mejora significativamente la calidad de los embeddings
+            desc = batch["description"].fillna("") if "description" in batch.columns else pd.Series([""]*len(batch))
             texts = (
                 t + " " + t + " " +
                 batch["author"].fillna("") + " " +
                 batch["genre"].fillna("") + " " +
-                batch["format"].fillna("")
+                desc
             ).tolist()
 
             batch_embs = model.encode(
@@ -215,17 +223,18 @@ def content_based_recommendations(
     if all_books.empty:
         return []
 
-    # Cold start: sin interacciones → libros mejor valorados del dataset
+    # Cold start: sin interacciones → libros más populares (más likes+favoritos)
     if not weights:
-        source = all_books.sort_values("average_rating", ascending=False).head(limit)
+        pop_col = "popularity" if "popularity" in all_books.columns else "average_rating"
+        source = all_books.sort_values(pop_col, ascending=False).head(limit)
+        max_pop = float(source[pop_col].max()) if float(source[pop_col].max()) > 0 else 1.0
         return [
             {
                 "book_id": int(row["id"]),
                 "title": row["title"],
                 "author": row["author"],
                 "genre": row["genre"],
-                "score": round(float(row["average_rating"]) / 5.0, 4)
-                if row["average_rating"] else 0.5,
+                "score": round(float(row[pop_col]) / max_pop, 4),
                 "reason": "Mejor valorado por la comunidad",
             }
             for _, row in source.iterrows()
@@ -272,9 +281,27 @@ def content_based_recommendations(
         max_aff = max(author_affinity.values())
         author_lower = all_books["author"].fillna("").str.strip().str.lower()
         boost = author_lower.map(
-            lambda a: author_affinity.get(a, 0.0) / max_aff * 0.30
+            lambda a: author_affinity.get(a, 0.0) / max_aff * 0.45
         ).values.astype(np.float32)
         scores = scores + boost
+
+    # Genre affinity boost ──────────────────────────────────────────────────
+    # Boost libros del mismo género que el usuario ha interactuado.
+    genre_affinity: Dict[str, float] = {}
+    for idx in interacted_idx:
+        bid = int(all_books.iloc[idx]["id"])
+        w = weights.get(bid, 1.0)
+        genre = str(all_books.iloc[idx].get("genre", "") or "").strip()
+        if genre:
+            genre_affinity[genre] = genre_affinity.get(genre, 0.0) + w
+
+    if genre_affinity:
+        max_genre = max(genre_affinity.values())
+        genre_col = all_books["genre"].fillna("").str.strip()
+        genre_boost = genre_col.map(
+            lambda g: genre_affinity.get(g, 0.0) / max_genre * 0.20
+        ).values.astype(np.float32)
+        scores = scores + genre_boost
     # ────────────────────────────────────────────────────────────────────────
 
     all_books = all_books.copy()
@@ -427,25 +454,39 @@ def get_recommendations(db: Session, user_id: int, limit: int = 10) -> Dict:
         cb_recs = content_based_recommendations(db, user_id, limit)
         cf_recs = collaborative_filtering(db, user_id, limit)
 
-        if cf_recs:
+        # Solo incluir items de CF con score significativo (≥ 0.10).
+        # Con matrices muy dispersas el CF genera scores ~0 para casi todo,
+        # lo que contamina el resultado con géneros incoherentes y muestra
+        # "Relevancia: 0.0%" en la UI.
+        GOOD_CF_THRESHOLD = 0.10
+        good_cf = [r for r in cf_recs if r.get("score", 0.0) >= GOOD_CF_THRESHOLD]
+
+        if good_cf:
             seen: set = set()
             merged: List[Dict] = []
 
-            # 50 % Item-Item CF
-            for rec in cf_recs[: limit // 2]:
+            # Hasta 50 % de CF de calidad
+            for rec in good_cf[: limit // 2]:
                 if rec["book_id"] not in seen:
                     seen.add(rec["book_id"])
                     merged.append(rec)
 
-            # Rellenar con contenido semántico
+            # Rellenar siempre con contenido semántico (garantiza coherencia)
             for rec in cb_recs:
                 if rec["book_id"] not in seen and len(merged) < limit:
                     seen.add(rec["book_id"])
                     merged.append(rec)
 
+            # Re-normalizar scores del merge para que la UI muestre % coherentes
+            if merged:
+                max_s = max(r["score"] for r in merged) or 1.0
+                for r in merged:
+                    r["score"] = round(r["score"] / max_s, 4)
+
             recs = merged
             algorithm = "hybrid"
         else:
+            # CF no aporta nada útil → solo contenido semántico
             recs = cb_recs
             algorithm = "content-based"
 
@@ -623,9 +664,25 @@ def evaluate_metrics(db: Session, k: int = 10, sample_size: int = 50) -> Dict:
         if eval_author_affinity:
             max_aff = max(eval_author_affinity.values())
             boost = all_books["author"].fillna("").str.strip().str.lower().map(
-                lambda a: eval_author_affinity.get(a, 0.0) / max_aff * 0.30
+                lambda a: eval_author_affinity.get(a, 0.0) / max_aff * 0.45
             ).values.astype(np.float32)
             scores = scores + boost
+
+        # Genre affinity boost en evaluación
+        eval_genre_affinity: Dict[str, float] = {}
+        for idx in interacted_idxs:
+            bid = int(all_books.iloc[idx]["id"])
+            w = reduced_history.get(bid, 1.0)
+            genre = str(all_books.iloc[idx].get("genre", "") or "").strip()
+            if genre:
+                eval_genre_affinity[genre] = eval_genre_affinity.get(genre, 0.0) + w
+
+        if eval_genre_affinity:
+            max_g = max(eval_genre_affinity.values())
+            genre_boost = all_books["genre"].fillna("").str.strip().map(
+                lambda g: eval_genre_affinity.get(g, 0.0) / max_g * 0.20
+            ).values.astype(np.float32)
+            scores = scores + genre_boost
 
 
         # excluyendo el historial reducido. Evaluación estratificada por
@@ -652,7 +709,7 @@ def evaluate_metrics(db: Session, k: int = 10, sample_size: int = 50) -> Dict:
         pool_sorted = pool.sort_values("_score", ascending=False)
         author_count: Dict[str, int] = {}
         filtered_rows = []
-        MAX_PER_AUTHOR = 3
+        MAX_PER_AUTHOR = 5
         for _, row in pool_sorted.iterrows():
             author_key = str(row.get("author", "")).strip().lower()
             count = author_count.get(author_key, 0)

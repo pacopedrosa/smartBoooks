@@ -25,16 +25,16 @@ DB = {
 ML_METRICS_URL = "http://localhost:8002/metrics?k=10&sample_size=50"
 
 PROFILES = [
-    {"name": "Lector Sci-Fi",  "primary": "Science-Fiction-Fantasy-Horror", "secondary": "Teen-Young-Adult"},
-    {"name": "Historiador",    "primary": "History-Archaeology",             "secondary": "Society-Social-Sciences"},
-    {"name": "Empresario",     "primary": "Business-Finance-Law",            "secondary": "Mind-Body-Spirit"},
-    {"name": "Cocinero",       "primary": "Food-Drink",                      "secondary": "Home-Garden"},
-    {"name": "Naturalista",    "primary": "Natural-History",                 "secondary": "Science-Geography"},
-    {"name": "Poeta",          "primary": "Poetry-Drama",                    "secondary": "Humour"},
-    {"name": "Salud Total",    "primary": "Health",                          "secondary": "Mind-Body-Spirit"},
-    {"name": "Manualidades",   "primary": "Crafts-Hobbies",                  "secondary": "Home-Garden"},
-    {"name": "Medico",         "primary": "Medical",                         "secondary": "Health"},
-    {"name": "Joven Lector",   "primary": "Teen-Young-Adult",                "secondary": "Science-Fiction-Fantasy-Horror"},
+    {"name": "Lector Sci-Fi",   "primary": "Fiction-Science Fiction-General",          "secondary": "Fiction-Fantasy-General"},
+    {"name": "Thriller Fan",    "primary": "Fiction-Thrillers-General",                "secondary": "Fiction-Mystery & Detective-General"},
+    {"name": "Literario",       "primary": "Fiction-Literary",                         "secondary": "Fiction-General"},
+    {"name": "Historiador",     "primary": "History-General",                          "secondary": "History-United States-General"},
+    {"name": "Empresario",      "primary": "Business & Economics-General",             "secondary": "Self-Help-General"},
+    {"name": "Cocinero",        "primary": "Cooking-General",                          "secondary": "Cooking-Methods-General"},
+    {"name": "Romántico",       "primary": "Fiction-Romance-General",                  "secondary": "Fiction-Romance-Contemporary"},
+    {"name": "Joven Lector",    "primary": "Juvenile Fiction-General",                 "secondary": "Juvenile Nonfiction-General"},
+    {"name": "Religioso",       "primary": "Religion-Christian Life-General",          "secondary": "Religion-General"},
+    {"name": "Detective Fan",   "primary": "Fiction-Mystery & Detective-General",      "secondary": "Fiction-Thrillers-Suspense"},
 ]
 
 USERS_PER_PROFILE = 5   # 10 perfiles × 5 = 50 usuarios

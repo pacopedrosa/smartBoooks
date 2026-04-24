@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS books (
     id             SERIAL PRIMARY KEY,
     title          VARCHAR(600) NOT NULL,
-    author         VARCHAR(255),
-    genre          VARCHAR(100),
+    author         TEXT,
+    genre          TEXT,
     format         VARCHAR(50),
     description    TEXT,
     cover_url      VARCHAR(1000),

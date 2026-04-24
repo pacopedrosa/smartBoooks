@@ -46,9 +46,9 @@ services:
     container_name: smartbooks-ml
     environment:
       DATABASE_URL: postgresql://smartbooks:smartbooks_password@postgres:5432/smartbooks
-      DATASET_PATH: /data/main_dataset.csv
+      DATASET_PATH: /data/BooksDatasetClean.csv
     volumes:
-      - ./main_dataset.csv:/data/main_dataset.csv:ro
+      - ./BooksDatasetClean.csv:/data/BooksDatasetClean.csv:ro
     ports:
       - "8002:8000"
     depends_on:
