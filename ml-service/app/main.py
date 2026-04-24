@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from .database import get_db, SessionLocal
-from .schemas import RecommendationResponse, SimilarBooksResponse
-from .recommender import get_recommendations, get_similar_books, _get_all_books, _get_embeddings
+from .schemas import RecommendationResponse, SimilarBooksResponse, MetricsResponse
+from .recommender import get_recommendations, get_similar_books, evaluate_metrics, _get_all_books, _get_embeddings
 from .seed import seed_books
 
 logging.basicConfig(level=logging.INFO)
@@ -108,3 +108,29 @@ def similar_books_endpoint(
     except Exception as exc:
         logger.error("Error finding similar books for book %d: %s", book_id, exc)
         raise HTTPException(status_code=500, detail="Error al buscar libros similares")
+
+
+@app.get("/metrics", response_model=MetricsResponse)
+def metrics_endpoint(
+    k: int = Query(default=10, ge=1, le=50),
+    sample_size: int = Query(default=50, ge=5, le=200),
+    db: Session = Depends(get_db),
+):
+    """
+    Evalúa la calidad del sistema de recomendación usando Leave-One-Out.
+
+    Para cada usuario de la muestra, oculta su interacción más reciente,
+    genera recomendaciones y mide si el libro ocultado aparece en top-K.
+
+    Métricas devueltas:
+    - hit_rate       : % de usuarios donde se acertó al menos 1 libro
+    - precision_at_k : media de aciertos / K por usuario
+    - recall_at_k    : media de aciertos / total relevantes por usuario
+    - ndcg_at_k      : calidad del orden (penaliza aciertos tardíos en la lista)
+    """
+    try:
+        result = evaluate_metrics(db, k=k, sample_size=sample_size)
+        return result
+    except Exception as exc:
+        logger.error("Error evaluando métricas: %s", exc)
+        raise HTTPException(status_code=500, detail="Error al calcular métricas")
