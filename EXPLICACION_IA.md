@@ -11,7 +11,7 @@
 | Deep Learning | `all-MiniLM-L6-v2` (modelo Transformer/SBERT) | No supervisado (preentrenado) |
 | Recomendación | Filtrado basado en contenido semántico | No supervisado |
 | Recomendación | Filtrado colaborativo Item-Item | No supervisado |
-| Big Data | 32k libros + embeddings de 384 dimensiones cacheados en PostgreSQL, procesados en batches de 512 | ✓ |
+| Big Data | 103k libros + embeddings de 384 dimensiones cacheados en PostgreSQL, procesados en batches de 512 | ✓ |
 
 ### ¿Es válido usar un modelo preentrenado?
 
@@ -73,11 +73,13 @@ No existe físicamente. Es una metáfora para explicar algo matemático. Imagina
 
 El sistema no sabe nada del usuario. Solución: **¿qué le gusta a todo el mundo?**
 
-Devuelve los libros con mejor nota media del dataset. Como cuando llegas a Netflix sin haber visto nada y te muestra "Los más populares". No hay IA aquí, es popularidad pura.
+Devuelve los libros más populares del sistema, ordenados por número de likes y favoritos acumulados. Como cuando llegas a Netflix sin haber visto nada y te muestra "Los más populares". No hay IA aquí, es popularidad pura.
 
 **Código relevante en `recommender.py`:**
 ```python
-source = all_books.sort_values("average_rating", ascending=False).head(limit)
+# Usa la columna "popularity" (likes + favoritos); si no existe, cae a average_rating
+pop_col = "popularity" if "popularity" in all_books.columns else "average_rating"
+source = all_books.sort_values(pop_col, ascending=False).head(limit)
 ```
 
 ---
@@ -169,13 +171,14 @@ for rec in cb_recs:
 
 La similitud coseno es la fórmula que mide qué tan parecidos son dos conjuntos de 384 números. Devuelve un valor entre 0 y 1: cuanto más cercano a 1, más parecidos son.
 
-Se calcula en tres puntos del archivo `recommender.py`:
+Se calcula en cuatro puntos del archivo `recommender.py`:
 
 | Dónde | Para qué | Código |
 |-------|----------|--------|
 | Función `content_based_recommendations` | Compara el perfil del usuario contra todos los libros | `scores = cosine_similarity(user_profile, emb_matrix).flatten()` |
 | Función `collaborative_filtering` | Compara libros entre sí según comportamiento de usuarios | `item_sim = cosine_similarity(matrix.T)` |
 | Función `get_similar_books` | Compara un libro concreto contra todos los demás | `scores = cosine_similarity(emb_matrix[idx].reshape(1, -1), emb_matrix).flatten()` |
+| Función `evaluate_metrics` | Evalúa el sistema: perfil reducido del usuario contra todos los libros | `scores = cosine_similarity(user_profile, emb_matrix).flatten()` |
 
 ---
 
@@ -231,9 +234,9 @@ De todos los libros relevantes para el usuario, ¿cuántos aparecieron en las re
 #### NDCG@K — "¿Pusiste los mejores primero?"
 Igual que las anteriores pero penaliza que el libro correcto aparezca tarde en la lista. Un acierto en el puesto 1 vale más que uno en el puesto 10.
 
-> Acierto en posición 1 → NDCG = 1.0 (máximo)
-> Acierto en posición 5 → NDCG ≈ 0.43
-> Acierto en posición 10 → NDCG ≈ 0.29
+> Acierto en posición 1 → NDCG = 1.0 (máximo) → 1 / log₂(1+1) = 1.0
+> Acierto en posición 5 → NDCG ≈ 0.39 → 1 / log₂(5+1) = 1/2.585
+> Acierto en posición 10 → NDCG ≈ 0.29 → 1 / log₂(10+1) = 1/3.459
 > Sin acierto → NDCG = 0.0
 
 ### Cómo usar el endpoint
