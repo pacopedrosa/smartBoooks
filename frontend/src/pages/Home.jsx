@@ -55,8 +55,9 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-[#1e3a5f] mb-3">¿Cómo funciona?</h2>
           <p className="text-slate-500 max-w-xl mx-auto mb-6 text-sm leading-relaxed">
             SmartBooks analiza tus interacciones (likes, favoritos y valoraciones) para generar
-            recomendaciones únicas mediante filtrado basado en contenido (TF-IDF) y filtrado
-            colaborativo. Con más interacciones, el sistema híbrido combina ambos enfoques.
+            recomendaciones únicas mediante IA: utiliza modelos semánticos para entender el contenido de los libros
+            y filtrado colaborativo para aprovechar los gustos de otros lectores. Cuantas más interacciones, más
+            personalizado y preciso es el sistema híbrido.
           </p>
           {!user && (
             <Link to="/register" className="bg-[#1e3a5f] hover:bg-[#16304f] text-white font-bold px-6 py-3 rounded-lg transition-colors">
